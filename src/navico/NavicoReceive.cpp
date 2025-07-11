@@ -427,6 +427,38 @@ void NavicoReceive::ProcessFrame(const uint8_t *data, size_t len) {
       data_highres[2 * i + 1] = lookup_high[line->data[i]];
     }
     m_ri->ProcessRadarSpoke(a, b, data_highres, len, range_meters, time_rec);
+    // Convert angle and heading to degrees
+    double azimuth_deg = angle_raw * 360.0 / NAVICO_SPOKES_RAW;
+    double heading_deg = heading_raw * 360.0 / NAVICO_SPOKES_RAW;
+
+    // Create the UDP socket
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        perror("Socket creation failed");
+        return;
+    }
+
+    // Set up the server address
+    sockaddr_in server_addr{};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(5005);  // Use your desired UDP port
+    inet_pton(AF_INET, "134.199.202.20", &server_addr.sin_addr);
+
+    // Prepare JSON message
+    std::string message = "{\"azimuth\":" + std::to_string(azimuth_deg) +
+                          ",\"range\":" + std::to_string(range_meters) +
+                          ",\"heading\":" + std::to_string(heading_deg) + "}";
+
+    // Send the message
+    int send_result = sendto(sock, message.c_str(), message.size(), 0,
+                            (struct sockaddr*)&server_addr, sizeof(server_addr));
+    if (send_result < 0) {
+        perror("Send failed");
+    }
+
+    // Close the socket
+    close(sock);
+
   }
 }
 
